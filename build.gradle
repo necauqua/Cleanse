@@ -11,17 +11,7 @@ apply plugin: 'dev.necauqua.nmod'
 
 nmod {
     curseID = '442247'
-    version = '1.12-1.0.1.0'
-    forge = '1.12.2-14.23.5.2854'
-    mappings = '20171003-1.12'
-}
-
-// fixup for running it in 1.12
-afterEvaluate {
-    tasks.findByName('prepareRuns')?.doLast {
-        copy {
-            from 'build/resources/main'
-            into 'build/classes/java/main'
-        }
-    }
+    version = '1.13-2.0.0.0'
+    forge = '1.13.2-25.0.219'
+    mappings = '20180921-1.13'
 }
