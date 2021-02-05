@@ -11,7 +11,7 @@ apply plugin: 'dev.necauqua.nmod'
 
 nmod {
     curseID = '442247'
-    version = '1.13-2.0.0.0'
-    forge = '1.13.2-25.0.219'
-    mappings = '20180921-1.13'
+    version = '1.14-3.0.0.0'
+    forge = '1.14.4-28.2.23'
+    mappings = '20190719-1.14.3'
 }

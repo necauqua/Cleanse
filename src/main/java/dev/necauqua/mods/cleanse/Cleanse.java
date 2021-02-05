@@ -4,19 +4,21 @@ import com.google.common.collect.ForwardingList;
 import com.google.gson.JsonParser;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.*;
-import net.minecraft.util.JsonUtils;
+import net.minecraft.client.gui.screen.MainMenuScreen;
+import net.minecraft.client.gui.screen.MultiplayerScreen;
+import net.minecraft.util.JSONUtils;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentTranslation;
+import net.minecraft.util.text.TranslationTextComponent;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientChatReceivedEvent;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.common.ForgeConfigSpec;
+import net.minecraftforge.event.TickEvent.ClientTickEvent;
+import net.minecraftforge.event.TickEvent.Phase;
 import net.minecraftforge.fml.ExtensionPoint;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.gameevent.TickEvent.ClientTickEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent.Phase;
 import net.minecraftforge.fml.config.ModConfig.ModConfigEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.loading.FMLEnvironment;
@@ -95,13 +97,13 @@ public final class Cleanse {
                 return;
             }
 
-            if (!(e.getGui() instanceof GuiMainMenu) && !(e.getGui() instanceof GuiMultiplayer)) {
+            if (!(e.getGui() instanceof MainMenuScreen) && !(e.getGui() instanceof MultiplayerScreen)) {
                 return;
             }
             // ^ and then this serves as the indication that the world got closed,
             // so we can prepare for the next time it is opened again..
 
-            GuiNewChat chat = Minecraft.getInstance().ingameGUI.getChatGUI();
+            NewChatGui chat = Minecraft.getInstance().ingameGUI.getChatGUI();
 
             // ..and also when the game is first started so we can prepare our dirty injections
             if (filteredChatLines == null) {
@@ -144,7 +146,7 @@ public final class Cleanse {
                 return;
             }
             // reset the filters after it runs out
-            GuiNewChat chat = Minecraft.getInstance().ingameGUI.getChatGUI();
+            NewChatGui chat = Minecraft.getInstance().ingameGUI.getChatGUI();
             sanityCheck(chat);
             chat.chatLines = originalChatLines;
             chat.drawnChatLines = originalDrawnChatLines;
@@ -158,17 +160,17 @@ public final class Cleanse {
                 return;
             }
             Minecraft mc = Minecraft.getInstance();
-            GuiNewChat chat = mc.ingameGUI.getChatGUI();
+            NewChatGui chat = mc.ingameGUI.getChatGUI();
 
-            // copying vanilla behaviour from the GuiNewChat#setChatLine here
+            // copying vanilla behaviour from the NewChatGui#setChatLine here
             int i = MathHelper.floor((float) chat.getChatWidth() / chat.getScale());
-            allowedLines = GuiUtilRenderComponents.splitText(e.getMessage(), i, mc.fontRenderer, false, false);
+            allowedLines = RenderComponentsUtil.splitText(e.getMessage(), i, mc.fontRenderer, false, false);
         });
     }
 
     // idk maybe somebody else is also changing those exact
     // two private final fields, scream about it in logs
-    private static void sanityCheck(GuiNewChat chat) {
+    private static void sanityCheck(NewChatGui chat) {
         if (chat.chatLines != originalChatLines && chat.chatLines != filteredChatLines) {
             logger.error("SOME OTHER MOD DID THE SAME DIRTY HACK WE DID, " +
                     "THE `chatLines` FIELD WAS REPLACED WITH SOMETHING ELSE, THIS WILL BREAK THEIR THINGS");
@@ -183,7 +185,7 @@ public final class Cleanse {
     // a translation message and that its lang key is present in vanilla (and well, forge) lang files
     // does not work for /tellraw though, but oh well, good enough
     private static boolean isVanilla(ITextComponent text) {
-        return text instanceof TextComponentTranslation && vanillaLangKeys.contains(((TextComponentTranslation) text).getKey());
+        return text instanceof TranslationTextComponent && vanillaLangKeys.contains(((TranslationTextComponent) text).getKey());
     }
 
     // idk looked too messy so moved to a separate method
@@ -212,7 +214,7 @@ public final class Cleanse {
             if (is == null) {
                 return emptySet();
             }
-            return JsonUtils.getJsonObject(new JsonParser().parse(new InputStreamReader(is)), "root")
+            return JSONUtils.getJsonObject(new JsonParser().parse(new InputStreamReader(is)), "root")
                     .entrySet()
                     .stream()
                     .map(Map.Entry::getKey)
