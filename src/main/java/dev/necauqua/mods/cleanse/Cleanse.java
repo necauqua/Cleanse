@@ -3,9 +3,12 @@ package dev.necauqua.mods.cleanse;
 import com.google.common.collect.ForwardingList;
 import com.google.gson.JsonParser;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.*;
+import net.minecraft.client.gui.ChatLine;
+import net.minecraft.client.gui.NewChatGui;
+import net.minecraft.client.gui.RenderComponentsUtil;
 import net.minecraft.client.gui.screen.MainMenuScreen;
 import net.minecraft.client.gui.screen.MultiplayerScreen;
+import net.minecraft.util.IReorderingProcessor;
 import net.minecraft.util.JSONUtils;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.text.ITextComponent;
@@ -14,6 +17,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientChatReceivedEvent;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.common.ForgeConfigSpec;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent.ClientTickEvent;
 import net.minecraftforge.event.TickEvent.Phase;
 import net.minecraftforge.fml.ExtensionPoint;
@@ -63,12 +67,12 @@ public final class Cleanse {
     private static int timer = 0;
     private static boolean checkWorldEnter = true;
 
-    private static List<ChatLine> originalChatLines;
-    private static List<ChatLine> originalDrawnChatLines;
-    private static List<ChatLine> filteredChatLines;
-    private static List<ChatLine> filteredDrawnChatLines;
+    private static List<ChatLine<ITextComponent>> originalChatLines;
+    private static List<ChatLine<IReorderingProcessor>> originalDrawnChatLines;
+    private static List<ChatLine<ITextComponent>> filteredChatLines;
+    private static List<ChatLine<IReorderingProcessor>> filteredDrawnChatLines;
 
-    private static List<ITextComponent> allowedLines = emptyList();
+    private static List<IReorderingProcessor> allowedLines = emptyList();
 
     private static ForgeConfigSpec.IntValue timeoutProp;
 
@@ -107,9 +111,9 @@ public final class Cleanse {
 
             // ..and also when the game is first started so we can prepare our dirty injections
             if (filteredChatLines == null) {
-                filteredChatLines = new FilteredAddList<>(originalChatLines = chat.chatLines, line -> isVanilla(line.getChatComponent()));
+                filteredChatLines = new FilteredAddList<>(originalChatLines = chat.chatLines, line -> isVanilla(line.getLineString()));
                 filteredDrawnChatLines = new FilteredAddList<>(originalDrawnChatLines = chat.drawnChatLines, line -> {
-                    if (allowedLines.isEmpty() || !line.getChatComponent().getFormattedText().equals(allowedLines.get(0).getFormattedText())) {
+                    if (allowedLines.isEmpty() || !extractString(line.getLineString()).equals(extractString(allowedLines.get(0)))) {
                         return false;
                     }
                     allowedLines.remove(0);
@@ -163,8 +167,8 @@ public final class Cleanse {
             NewChatGui chat = mc.ingameGUI.getChatGUI();
 
             // copying vanilla behaviour from the NewChatGui#setChatLine here
-            int i = MathHelper.floor((float) chat.getChatWidth() / chat.getScale());
-            allowedLines = RenderComponentsUtil.splitText(e.getMessage(), i, mc.fontRenderer, false, false);
+            int i = MathHelper.floor((double) chat.getChatWidth() / chat.getScale());
+            allowedLines = RenderComponentsUtil.func_238505_a_(e.getMessage(), i, mc.fontRenderer);
         });
     }
 
@@ -186,6 +190,16 @@ public final class Cleanse {
     // does not work for /tellraw though, but oh well, good enough
     private static boolean isVanilla(ITextComponent text) {
         return text instanceof TranslationTextComponent && vanillaLangKeys.contains(((TranslationTextComponent) text).getKey());
+    }
+
+    // meh
+    private static String extractString(IReorderingProcessor reorderingProcessor) {
+        StringBuilder sb = new StringBuilder();
+        reorderingProcessor.accept((index, style, codePoint) -> {
+            sb.appendCodePoint(codePoint);
+            return true;
+        });
+        return sb.toString();
     }
 
     // idk looked too messy so moved to a separate method
