@@ -1,9 +1,10 @@
 buildscript {
     repositories {
+        mavenLocal()
         maven { url = 'https://maven.necauqua.dev' }
     }
     dependencies {
-        classpath 'dev.necauqua:necauqua-mod:0.6.3'
+        classpath 'dev.necauqua:necauqua-mod:0.7.1'
     }
 }
 
@@ -11,7 +12,8 @@ apply plugin: 'dev.necauqua.nmod'
 
 nmod {
     curseID = '442247'
-    version = '1.16-5.0.0.0'
-    forge = '1.16.5-36.0.14'
-    mappings = '20201028-1.16.3'
+    version = '1.17-6.0.0.0'
+    forge = '1.17.1-37.1.1'
+    mappings = '1.17.1'
+    javaVersion = 17
 }

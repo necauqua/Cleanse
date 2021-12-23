@@ -1,37 +1,37 @@
+/*
+ * Copyright (c) 2017-2021 Anton Bulakh <self@necauqua.dev>
+ * Licensed under MIT, see the LICENSE file for details.
+ */
+
 package dev.necauqua.mods.cleanse;
 
 import com.google.common.collect.ForwardingList;
 import com.google.gson.JsonParser;
+import net.minecraft.client.GuiMessage;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.ChatLine;
-import net.minecraft.client.gui.NewChatGui;
-import net.minecraft.client.gui.RenderComponentsUtil;
-import net.minecraft.client.gui.screen.MainMenuScreen;
-import net.minecraft.client.gui.screen.MultiplayerScreen;
-import net.minecraft.util.IReorderingProcessor;
-import net.minecraft.util.JSONUtils;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TranslationTextComponent;
+import net.minecraft.client.gui.components.ChatComponent;
+import net.minecraft.client.gui.components.ComponentRenderUtils;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.GsonHelper;
+import net.minecraft.util.Mth;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientChatReceivedEvent;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent.ClientTickEvent;
 import net.minecraftforge.event.TickEvent.Phase;
-import net.minecraftforge.fml.ExtensionPoint;
+import net.minecraftforge.fml.IExtensionPoint.DisplayTest;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig.ModConfigEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.loading.FMLEnvironment;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.HashSet;
 import java.util.List;
@@ -44,12 +44,10 @@ import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.toSet;
 import static net.minecraftforge.common.MinecraftForge.EVENT_BUS;
 import static net.minecraftforge.fml.config.ModConfig.Type.CLIENT;
-import static net.minecraftforge.fml.network.FMLNetworkConstants.IGNORESERVERONLY;
+import static net.minecraftforge.fmllegacy.network.FMLNetworkConstants.IGNORESERVERONLY;
 
-@Mod(Cleanse.ID)
+@Mod("cleanse")
 public final class Cleanse {
-
-    public static final String ID = "cleanse";
 
     private static final Logger logger = LogManager.getLogger();
 
@@ -62,19 +60,15 @@ public final class Cleanse {
     }
 
     // all of those fields are non-local because they are mutable lol
-    private static int timeout = 20;
-
     private static int timer = 0;
     private static boolean checkWorldEnter = true;
 
-    private static List<ChatLine<ITextComponent>> originalChatLines;
-    private static List<ChatLine<IReorderingProcessor>> originalDrawnChatLines;
-    private static List<ChatLine<ITextComponent>> filteredChatLines;
-    private static List<ChatLine<IReorderingProcessor>> filteredDrawnChatLines;
+    private static List<GuiMessage<Component>> originalChatLines;
+    private static List<GuiMessage<FormattedCharSequence>> originalDrawnChatLines;
+    private static List<GuiMessage<Component>> filteredChatLines;
+    private static List<GuiMessage<FormattedCharSequence>> filteredDrawnChatLines;
 
-    private static List<IReorderingProcessor> allowedLines = emptyList();
-
-    private static ForgeConfigSpec.IntValue timeoutProp;
+    private static List<FormattedCharSequence> allowedLines = emptyList();
 
     public Cleanse() {
         if (FMLEnvironment.dist != Dist.CLIENT) {
@@ -82,38 +76,43 @@ public final class Cleanse {
             return;
         }
 
-        setupConfig();
+        var configBuilder = new ForgeConfigSpec.Builder();
+        var timeout = configBuilder
+            .translation("config.cleanse:delay.name")
+            .comment("Time in ticks that determines the duration of the chat suppression after you enter a world")
+            .defineInRange("delay", 20, 1, Integer.MAX_VALUE);
+        ModLoadingContext.get().registerConfig(CLIENT, configBuilder.build(), "cleanse.toml");
 
         // allow connecting to vanilla servers
-        ModLoadingContext.get().registerExtensionPoint(ExtensionPoint.DISPLAYTEST, () -> Pair.of(() -> IGNORESERVERONLY, (a, b) -> true));
+        ModLoadingContext.get().registerExtensionPoint(DisplayTest.class, () -> new DisplayTest(() -> IGNORESERVERONLY, (a, b) -> true));
 
         // GuiOpenEvent is (sadly) the best way to detect when events that we need happen:
         // entering the world after it was loaded and closing said world,
-        // and also coincidentally the closest event to the ingameGUI field instantiation
+        // and also coincidentally the closest event to the mc.gui field instantiation
         EVENT_BUS.addListener((GuiOpenEvent e) -> {
 
-            // this check allows to run code exactly at the moment
+            // this check allows running code exactly at the moment
             // after the world finished loading and is rendered
             if (e.getGui() == null && checkWorldEnter) {
                 checkWorldEnter = false;
-                timer = timeout;
-                logger.info("Started the timer to reenable adding new chat lines, waiting for {} ticks", timeout);
+                timer = timeout.get();
+                logger.info("Started the timer to reenable adding new chat lines, waiting for {} ticks", timer);
                 return;
             }
 
-            if (!(e.getGui() instanceof MainMenuScreen) && !(e.getGui() instanceof MultiplayerScreen)) {
+            if (!(e.getGui() instanceof TitleScreen) && !(e.getGui() instanceof JoinMultiplayerScreen)) {
                 return;
             }
             // ^ and then this serves as the indication that the world got closed,
             // so we can prepare for the next time it is opened again..
 
-            NewChatGui chat = Minecraft.getInstance().ingameGUI.getChatGUI();
+            var chat = Minecraft.getInstance().gui.getChat();
 
-            // ..and also when the game is first started so we can prepare our dirty injections
+            // ..and also when the game is first started, so we can prepare our dirty injections
             if (filteredChatLines == null) {
-                filteredChatLines = new FilteredAddList<>(originalChatLines = chat.chatLines, line -> isVanilla(line.getLineString()));
-                filteredDrawnChatLines = new FilteredAddList<>(originalDrawnChatLines = chat.drawnChatLines, line -> {
-                    if (allowedLines.isEmpty() || !extractString(line.getLineString()).equals(extractString(allowedLines.get(0)))) {
+                filteredChatLines = new FilteredAddList<>(originalChatLines = chat.allMessages, line -> isVanilla(line.getMessage()));
+                filteredDrawnChatLines = new FilteredAddList<>(originalDrawnChatLines = chat.trimmedMessages, line -> {
+                    if (allowedLines.isEmpty() || !extractString(line.getMessage()).equals(extractString(allowedLines.get(0)))) {
                         return false;
                     }
                     allowedLines.remove(0);
@@ -132,15 +131,15 @@ public final class Cleanse {
                 return;
             }
 
-            if (chat.chatLines == filteredChatLines && chat.drawnChatLines == filteredDrawnChatLines) {
+            if (chat.allMessages == filteredChatLines && chat.trimmedMessages == filteredDrawnChatLines) {
                 // to avoid running below code (including log spam) unnecessarily
                 // in case someone opens and closes multiplayer gui or similar
                 return;
             }
 
             sanityCheck(chat);
-            chat.chatLines = filteredChatLines;
-            chat.drawnChatLines = filteredDrawnChatLines;
+            chat.allMessages = filteredChatLines;
+            chat.trimmedMessages = filteredDrawnChatLines;
             logger.info("Disabled adding new chat lines");
         });
 
@@ -150,10 +149,10 @@ public final class Cleanse {
                 return;
             }
             // reset the filters after it runs out
-            NewChatGui chat = Minecraft.getInstance().ingameGUI.getChatGUI();
+            var chat = Minecraft.getInstance().gui.getChat();
             sanityCheck(chat);
-            chat.chatLines = originalChatLines;
-            chat.drawnChatLines = originalDrawnChatLines;
+            chat.allMessages = originalChatLines;
+            chat.trimmedMessages = originalDrawnChatLines;
             logger.info("Reenabled adding new chat lines");
         });
 
@@ -163,38 +162,38 @@ public final class Cleanse {
             if (!isVanilla(e.getMessage())) {
                 return;
             }
-            Minecraft mc = Minecraft.getInstance();
-            NewChatGui chat = mc.ingameGUI.getChatGUI();
+            var mc = Minecraft.getInstance();
+            var chat = mc.gui.getChat();
 
-            // copying vanilla behaviour from the NewChatGui#setChatLine here
-            int i = MathHelper.floor((double) chat.getChatWidth() / chat.getScale());
-            allowedLines = RenderComponentsUtil.func_238505_a_(e.getMessage(), i, mc.fontRenderer);
+            // copying vanilla behaviour from the ChatComponent#setChatLine here
+            var i = Mth.floor((double) chat.getWidth() / chat.getScale());
+            allowedLines = ComponentRenderUtils.wrapComponents(e.getMessage(), i, mc.font);
         });
     }
 
     // idk maybe somebody else is also changing those exact
     // two private final fields, scream about it in logs
-    private static void sanityCheck(NewChatGui chat) {
-        if (chat.chatLines != originalChatLines && chat.chatLines != filteredChatLines) {
+    private static void sanityCheck(ChatComponent chat) {
+        if (chat.allMessages != originalChatLines && chat.allMessages != filteredChatLines) {
             logger.error("SOME OTHER MOD DID THE SAME DIRTY HACK WE DID, " +
-                    "THE `chatLines` FIELD WAS REPLACED WITH SOMETHING ELSE, THIS WILL BREAK THEIR THINGS");
+                "THE `allMessages` FIELD WAS REPLACED WITH SOMETHING ELSE, THIS WILL BREAK THEIR THINGS");
         }
-        if (chat.drawnChatLines != originalDrawnChatLines && chat.drawnChatLines != filteredDrawnChatLines) {
+        if (chat.trimmedMessages != originalDrawnChatLines && chat.trimmedMessages != filteredDrawnChatLines) {
             logger.error("SOME OTHER MOD DID THE SAME DIRTY HACK WE DID, " +
-                    "THE `drawnChatLines` FIELD WAS REPLACED WITH SOMETHING ELSE, THIS WILL BREAK THEIR THINGS");
+                "THE `trimmedMessages` FIELD WAS REPLACED WITH SOMETHING ELSE, THIS WILL BREAK THEIR THINGS");
         }
     }
 
     // the best heuristic to check if a message is vanilla - to check if it's
     // a translation message and that its lang key is present in vanilla (and well, forge) lang files
     // does not work for /tellraw though, but oh well, good enough
-    private static boolean isVanilla(ITextComponent text) {
-        return text instanceof TranslationTextComponent && vanillaLangKeys.contains(((TranslationTextComponent) text).getKey());
+    private static boolean isVanilla(Component text) {
+        return text instanceof TranslatableComponent && vanillaLangKeys.contains(((TranslatableComponent) text).getKey());
     }
 
     // meh
-    private static String extractString(IReorderingProcessor reorderingProcessor) {
-        StringBuilder sb = new StringBuilder();
+    private static String extractString(FormattedCharSequence reorderingProcessor) {
+        var sb = new StringBuilder();
         reorderingProcessor.accept((index, style, codePoint) -> {
             sb.appendCodePoint(codePoint);
             return true;
@@ -202,37 +201,18 @@ public final class Cleanse {
         return sb.toString();
     }
 
-    // idk looked too messy so moved to a separate method
-    private static void setupConfig() {
-        ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
-
-        timeoutProp = builder
-                .translation("config.cleanse:delay.name")
-                .comment("Time in ticks that determines the duration of the chat suppression after you enter a world")
-                .defineInRange("delay", timeout, 1, Integer.MAX_VALUE);
-
-        ModLoadingContext.get().registerConfig(CLIENT, builder.build(), ID + ".toml");
-
-        FMLJavaModLoadingContext.get().getModEventBus().addListener((ModConfigEvent e) -> {
-            if (ID.equals(e.getConfig().getModId())) {
-                timeout = timeoutProp.get();
-                logger.debug("Loaded the timeout config property");
-            }
-        });
-    }
-
     // just read the set of keys from given resource in exact (almost,
     // json parsing is nicer here) same way vanilla does it in LanguageMap
     private static Set<String> loadKeys(String path) {
-        try (InputStream is = Cleanse.class.getResourceAsStream(path)) {
+        try (var is = Cleanse.class.getResourceAsStream(path)) {
             if (is == null) {
                 return emptySet();
             }
-            return JSONUtils.getJsonObject(new JsonParser().parse(new InputStreamReader(is)), "root")
-                    .entrySet()
-                    .stream()
-                    .map(Map.Entry::getKey)
-                    .collect(toSet());
+            return GsonHelper.convertToJsonObject(new JsonParser().parse(new InputStreamReader(is)), "root")
+                .entrySet()
+                .stream()
+                .map(Map.Entry::getKey)
+                .collect(toSet());
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read the localization file: " + path);
         }
