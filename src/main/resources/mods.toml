@@ -1,5 +1,5 @@
 modLoader = 'javafml'
-loaderVersion = '[37,)'
+loaderVersion = '[38,)'
 license = 'MIT'
 issueTrackerURL = 'https://github.com/necauqua/Cleanse/issues'
 
@@ -17,13 +17,13 @@ description = "Small clientside mod that helps to fix the 'big modpack chat spam
 [[dependencies.cleanse]]
 modId = 'forge'
 mandatory = true
-versionRange = '[37,)'
+versionRange = '[38,)'
 ordering = 'NONE'
 side = 'CLIENT'
 
 [[dependencies.cleanse]]
 modId = 'minecraft'
 mandatory = true
-versionRange = '[1.17,1.18)'
+versionRange = '[1.18,1.19)'
 ordering = 'NONE'
 side = 'BOTH'

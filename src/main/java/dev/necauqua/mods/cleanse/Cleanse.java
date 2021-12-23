@@ -20,7 +20,7 @@ import net.minecraft.util.GsonHelper;
 import net.minecraft.util.Mth;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientChatReceivedEvent;
-import net.minecraftforge.client.event.GuiOpenEvent;
+import net.minecraftforge.client.event.ScreenOpenEvent;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.event.TickEvent.ClientTickEvent;
 import net.minecraftforge.event.TickEvent.Phase;
@@ -44,7 +44,7 @@ import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.toSet;
 import static net.minecraftforge.common.MinecraftForge.EVENT_BUS;
 import static net.minecraftforge.fml.config.ModConfig.Type.CLIENT;
-import static net.minecraftforge.fmllegacy.network.FMLNetworkConstants.IGNORESERVERONLY;
+import static net.minecraftforge.network.NetworkConstants.IGNORESERVERONLY;
 
 @Mod("cleanse")
 public final class Cleanse {
@@ -89,18 +89,18 @@ public final class Cleanse {
         // GuiOpenEvent is (sadly) the best way to detect when events that we need happen:
         // entering the world after it was loaded and closing said world,
         // and also coincidentally the closest event to the mc.gui field instantiation
-        EVENT_BUS.addListener((GuiOpenEvent e) -> {
+        EVENT_BUS.addListener((ScreenOpenEvent e) -> {
 
             // this check allows running code exactly at the moment
             // after the world finished loading and is rendered
-            if (e.getGui() == null && checkWorldEnter) {
+            if (e.getScreen() == null && checkWorldEnter) {
                 checkWorldEnter = false;
                 timer = timeout.get();
                 logger.info("Started the timer to reenable adding new chat lines, waiting for {} ticks", timer);
                 return;
             }
 
-            if (!(e.getGui() instanceof TitleScreen) && !(e.getGui() instanceof JoinMultiplayerScreen)) {
+            if (!(e.getScreen() instanceof TitleScreen) && !(e.getScreen() instanceof JoinMultiplayerScreen)) {
                 return;
             }
             // ^ and then this serves as the indication that the world got closed,
@@ -208,7 +208,7 @@ public final class Cleanse {
             if (is == null) {
                 return emptySet();
             }
-            return GsonHelper.convertToJsonObject(new JsonParser().parse(new InputStreamReader(is)), "root")
+            return GsonHelper.convertToJsonObject(JsonParser.parseReader(new InputStreamReader(is)), "root")
                 .entrySet()
                 .stream()
                 .map(Map.Entry::getKey)
