@@ -1,7 +1,7 @@
 # Cleanse
 
 [![Downloads Number](http://cf.way2muchnoise.eu/short_cleanse.svg?badge_style=flat)](https://www.curseforge.com/minecraft/mc-mods/cleanse)
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/necauqua/cleanse/Release?style=flat-square)
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/necauqua/Cleanse/Push%20to%20main?style=flat-square)
 <br>
 [![Latest Release](https://img.shields.io/github/release/necauqua/cleanse.svg?label=last%20release&style=flat-square)](https://www.curseforge.com/minecraft/mc-mods/cleanse/files)
 
