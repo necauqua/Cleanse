@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "package": "dev.necauqua.mods.cleanse.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "cleanse.refmap.json",
+  "mixins": [
+  ],
+  "client": [
+    "ChatComponentMixin",
+    "MinecraftMixin"
+  ],
+  "minVersion": "0.8"
+}

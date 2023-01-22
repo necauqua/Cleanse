@@ -1,9 +1,12 @@
 # Cleanse
 
-[![Downloads Number](http://cf.way2muchnoise.eu/short_cleanse.svg?badge_style=flat)](https://www.curseforge.com/minecraft/mc-mods/cleanse)
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/necauqua/Cleanse/Push%20to%20main?style=flat-square)
+[![Modrinth Downloads](https://img.shields.io/modrinth/dt/cleanse?logo=Modrinth&label=&color=2d2d2d&style=flat-square)](https://modrinth.com/mod/cleanse)
+[![CurseForge Downloads](http://cf.way2muchnoise.eu/cleanse.svg?badge_style=flat)](https://www.curseforge.com/minecraft/mc-mods/cleanse)
 <br>
-[![Latest Release](https://img.shields.io/github/release/necauqua/cleanse.svg?label=last%20release&style=flat-square)](https://www.curseforge.com/minecraft/mc-mods/cleanse/files)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/necauqua/cleanse/push-to-main.yml?branch=main&style=flat-square)](https://github.com/necauqua/cleanse/actions/workflows/push-to-main.yml)
+[![Latest Release](https://img.shields.io/github/release/necauqua/cleanse.svg?label=last%20release&lcolor=2d2d2d&style=flat-square)](https://modrinth.com/mod/cleanse/version/latest)
+<br>
+[![Follow on Modrinth](https://img.shields.io/modrinth/followers/cleanse?label=follow%20on%20Modrinth&style=social)](https://modrinth.com/mod/cleanse)
 
 #### Remove the wall of text spammed into your chat on login!
 
